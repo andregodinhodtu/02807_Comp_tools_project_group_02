@@ -3,5 +3,7 @@
 Members:
 - André Godinho s253707, s253707@dtu.dk
 - Maxence Marbouty s253730, s253730@dtu.dk
+- Lucas Jutard s253050, s253050@dtu.dk
+- Mathieu Lafitte s253262, s253262@dtu.dk
 
-ugf
+zeub
