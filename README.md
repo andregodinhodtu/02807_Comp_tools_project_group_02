@@ -9,3 +9,6 @@ Members:
 
 04/11/2025
 Idea: The goal for now is to make data analysis to build a social network that connects people together on a basis that is not on their similarity, but their common interest
+
+DATA: https://www.kaggle.com/datasets/vivekchary/sentiment-with-16-million-tweets-with-locations
+
