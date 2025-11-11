@@ -37,7 +37,9 @@
    - output : matrix of distances between people (counting of the common frequent items between people)
  - Graph design and clustering of people (@matlafENSTA)
    - input : @andregodinhodtu's matrix
-   - output : graph (nodes = people, weighted links = items in common), clusters (DBSCAN)
+   - output : 
+     - graph analyze (nodes = people, weighted links = items in common).
+     - clusters (Girvan-Newman, Louvain, Spectral Clustering...)
 
 ---
 
@@ -55,3 +57,14 @@ DATASET : https://www.kaggle.com/datasets/vivekchary/sentiment-with-16-million-t
 
 Content :
 datetime (str) | user ID (str) | tweet content (str) | location (str)
+
+
+## Detailed Explanation
+
+### Graph Clustering
+First approach:
+The graph is first obtained by setting a */threshold*/ on the number of words in common connecting people: if two people tweeted similar */meaningful/* words more than */threshold/* times, they are considered as connected, otherwise no. 
+Second approach:
+Connect every users that once tweeted the same meaningful word(s). Connections between users have a weight equal to the number of word tweeted by both users: the result is a weighted graph.
+
+NB: */meaningful/* words
