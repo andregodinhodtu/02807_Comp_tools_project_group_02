@@ -27,7 +27,7 @@
  - Sampling and cleaning of the dataset (@Ljutard2023)
    - input : the whole dataset
    - output : a few shorter datasets, chosen with interest (no missing values, selection of 'users, ...). Same features as before, with selected observations.
-   - You will find subsets of different sizes with the location in the data folder. You can also use Data_Analysis.ipynb to obtain the same subsets without the location. 
+   - You will find subsets of different sizes with the location in the [data](./data/) folder. You can also use [Data_Analysis](/Data_Analysis.ipynb) notebook to obtain the same subsets without the location. 
  - MinHashing (@Teeresio) --> do whatever bro I don't understand that
  - Computing of frequent itemsets for tweets (@MaxenceMarbouty)
    - input : a dataset sample
