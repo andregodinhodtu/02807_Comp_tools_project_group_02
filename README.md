@@ -68,3 +68,21 @@ Second approach:
 Connect every users that once tweeted the same meaningful word(s). Connections between users have a weight equal to the number of word tweeted by both users: the result is a weighted graph.
 
 NB: */meaningful/* words
+
+## How to create new env 
+```
+python -m venv venv
+```
+(windows)
+```
+venv\Scripts\activate
+```
+(Mac/Linux)
+```
+source venv/bin/activate
+```
+Then, you need to install requirements:
+```
+pip install -r requirements.txt
+```
+Well done !
