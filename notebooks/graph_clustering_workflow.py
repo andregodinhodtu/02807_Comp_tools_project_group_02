@@ -179,7 +179,8 @@ if 'girvan_newman' in methods:
         plt.xlabel('# Communities'); plt.ylabel('Modularity Q'); plt.title('Girvan–Newman: modularity vs #communities')
         plt.grid(alpha=0.3); plt.tight_layout(); plt.show()
 
-    gcltr.visualize_graph(G, gn_best_labels, title=f"Girvan–Newman partition (Q={gn_Q:.3f}, k={len(gn_best)})")
+    if plot_graph:
+        gcltr.visualize_graph(G, gn_best_labels, title=f"Girvan–Newman partition (Q={gn_Q:.3f}, k={len(gn_best)})")
 
     nodes_ordered = sorted(G.nodes())
     
