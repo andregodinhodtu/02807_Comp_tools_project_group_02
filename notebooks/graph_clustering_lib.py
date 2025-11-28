@@ -126,7 +126,8 @@ def gen_matrix(N, max_val=10, lam=2.0, seed=42):
 # ---------------------------------------------
 # Simple visualization of the best partition (updated sizing/spacing)
 def visualize_graph(G, labels=None, title=None, hide_isolated=True,
-                     node_size=180, spacing_factor=2.0, edge_alpha=0.9):
+                     node_size=180, spacing_factor=2.0, edge_alpha=0.9,
+                     nb_clusters=None):
     """Visualize graph with nodes colored by cluster labels and edges by weight.
 
     Improvements:
@@ -149,6 +150,12 @@ def visualize_graph(G, labels=None, title=None, hide_isolated=True,
     edge_alpha : float
         Alpha transparency for edges.
 
+    Additional Parameters
+    ---------------------
+    nb_clusters : int or None
+        If provided and labels are given, only plot nodes belonging to the
+        largest `nb_clusters` clusters (by size) determined from `labels`.
+
     Returns
     -------
     dict with keys:
@@ -156,14 +163,29 @@ def visualize_graph(G, labels=None, title=None, hide_isolated=True,
         'shown_nodes'
         'layout_k' (the k value used for spring_layout)
     """
-    isolated_nodes = [n for n, d in G.degree() if d == 0]
-    nodes_to_plot = [n for n in G.nodes() if n not in isolated_nodes] if hide_isolated else list(G.nodes())
-    H = G.subgraph(nodes_to_plot).copy()
-    if H.number_of_nodes() == 0:
-        print(f"No nodes to plot (all {len(G)} nodes are isolated). Isolated count: {len(isolated_nodes)}")
-        return {'isolated_count': len(isolated_nodes), 'shown_nodes': [], 'layout_k': None}
     node_order = sorted(G.nodes())  # global ordering reference
     idx_map = {node:i for i,node in enumerate(node_order)}
+
+    # If requested, limit to the largest nb_clusters by label size
+    selected_nodes = set(G.nodes())
+    if nb_clusters is not None and labels is not None:
+        # compute cluster sizes
+        labels_arr = np.asarray(labels)
+        unique, counts = np.unique(labels_arr, return_counts=True)
+        order = np.argsort(-counts)  # descending by size
+        top_labels = set(unique[order][:int(nb_clusters)])
+        selected_nodes = {n for n in G.nodes() if labels_arr[idx_map[n]] in top_labels}
+
+    # Build subgraph of selected nodes first
+    H0 = G.subgraph(selected_nodes).copy()
+
+    # Optionally hide isolated nodes (after cluster filtering)
+    isolated_nodes = [n for n, d in H0.degree() if d == 0]
+    nodes_to_plot = [n for n in H0.nodes() if n not in isolated_nodes] if hide_isolated else list(H0.nodes())
+    H = H0.subgraph(nodes_to_plot).copy()
+    if H.number_of_nodes() == 0:
+        print(f"No nodes to plot (after filtering). Isolated count: {len(isolated_nodes)}")
+        return {'isolated_count': len(isolated_nodes), 'shown_nodes': [], 'layout_k': None}
     if labels is None:
         label_values = [0 for _ in H.nodes()]
     else:
@@ -193,7 +215,7 @@ def visualize_graph(G, labels=None, title=None, hide_isolated=True,
     plt.tight_layout(); plt.show()
     return {'isolated_count': len(isolated_nodes), 'shown_nodes': nodes_to_plot, 'layout_k': layout_k}
 
-def export_clusters(df, labels, node_ids, method_name, subset_name="horoscope_full", folder="..\\pre_results\\"):
+def export_clusters(df, labels, node_ids, method_name, subset_name="horoscope_full", folder="..\\pre_results\\clusters\\"):
     """
     Export clusters into a single HDF5 file for the given method.
 

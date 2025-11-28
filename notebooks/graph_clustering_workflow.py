@@ -24,7 +24,7 @@ input_method = 0
 # 0 for MinHashing matrix
 # 1 for Frequent Itemsets matrix
 # 2 for Random graph
-subset_idd = "general"
+subset_idd = "wellness"
 input_file_name = f"similarity_{subset_idd}_lsh"  # MinHashing
 # input_file_name = "shared_2_itemsets_pairs" # Frequent Itemsets
 # !! be sure to set the correct input_file_name according to input_method !!
@@ -32,10 +32,14 @@ input_file_name = f"similarity_{subset_idd}_lsh"  # MinHashing
 threshold = 0.3 # edges with weight below this value will be ignored
 methods = [ # select the methods you want to run by commenting
     'louvain',
-    'girvan_newman',
-    'greedy_modularity',
+    # 'girvan_newman',
+    'greedy',
 ]
+plot_graph = False
 pre_visualization = False
+
+# Number of largest clusters to plot (when labels available)
+nb_clusters_to_plot = 8
 
 # Dictionary to store runtimes for each method
 method_runtimes = {}
@@ -98,6 +102,9 @@ G.number_of_nodes(), G.number_of_edges()
 if pre_visualization:
     gcltr.visualize_graph(G)
 
+# Global node order for consistent labeling/exports
+node_order = sorted(G.nodes())
+
 # ---------------------------------------------
 #             Louvain Clustering
 # ---------------------------------------------
@@ -128,7 +135,8 @@ if 'louvain' in methods:
         plt.plot([r for r in summary.keys()], [v['n_comm_mean'] for v in summary.values()], 's--')
         plt.xlabel('Resolution'); plt.ylabel('Avg # Communities'); plt.title('Community count vs resolution'); plt.grid(alpha=0.3); plt.tight_layout(); plt.show()
 
-    gcltr.visualize_graph(G, best_labels, title=f"Louvain partition (resolution={best['resolution']})")
+    if plot_graph:
+        gcltr.visualize_graph(G, best_labels, title=f"Louvain partition (resolution={best['resolution']})", nb_clusters=nb_clusters_to_plot)
 
     nodes_ordered = sorted(G.nodes())
     
@@ -197,14 +205,14 @@ if 'girvan_newman' in methods:
 #        Greedy Modularity Clustering
 # ---------------------------------------------
 # Implement Greedy Modularity on the loaded graph
-if 'greedy_modularity' in methods:
+if 'greedy' in methods:
     t0_g = time.perf_counter()
     greedy_result = gcltr.run_greedy(G=G)
     gm_comms = greedy_result['communities']
     greedy_labels = greedy_result['labels']
     Q_gm = greedy_result['Q']
     # Visualize
-    gcltr.visualize_graph(G, greedy_labels, title=f"Greedy Modularity partition (Q={Q_gm:.3f}, k={len(gm_comms)})")
+    gcltr.visualize_graph(G, greedy_labels, title=f"Greedy Modularity partition (Q={Q_gm:.3f}, k={len(gm_comms)})", nb_clusters=nb_clusters_to_plot)
 
     # Optional: export clusters
     try:
@@ -212,37 +220,38 @@ if 'greedy_modularity' in methods:
             df=df,
             labels=greedy_labels,
             node_ids=node_order,
-            method_name='greedy_modularity',
+            method_name='greedy',
             subset_name=subset_idd
         )
     except Exception as e:
         print('Greedy export failed:', e)
 
-    method_runtimes['greedy_modularity'] = time.perf_counter() - t0_g
-    print(f"Greedy Modularity runtime: {method_runtimes['greedy_modularity']:.2f} s")
+    method_runtimes['greedy'] = time.perf_counter() - t0_g
+    print(f"Greedy Modularity runtime: {method_runtimes['greedy']:.2f} s")
 
 # ---------------------------------------------
 #    Compare Louvain and Greedy Modularity
 # ---------------------------------------------
-# Ensure both label arrays exist and align in length
-assert 'best_labels' in globals(), "Louvain labels 'best_labels' not found"
-assert 'greedy_labels' in globals(), "Greedy Modularity labels 'greedy_labels' not found"
-assert len(best_labels) == len(greedy_labels), "Label arrays must have same length"
-
-y_louvain = np.asarray(best_labels)
-y_greedy = np.asarray(greedy_labels)
-
-metrics = {
-    'Rand': rand_score(y_louvain, y_greedy),
-    'Adjusted Rand (ARI)': adjusted_rand_score(y_louvain, y_greedy),
-    'Jaccard (pair-counting)': gcltr.jaccard_partition(y_louvain, y_greedy),
-    'NMI': normalized_mutual_info_score(y_louvain, y_greedy)
-}
-df_metrics = pd.DataFrame(metrics, index=['Louvain vs GN']).T
-display(df_metrics)
-
-# Optional: quick sanity display of community counts
-print(f"Louvain communities: {len(np.unique(y_louvain))}, GN communities: {len(np.unique(y_greedy))}")
+# Compare only if both label arrays exist
+have_louvain = 'best_labels' in globals()
+have_greedy = 'greedy_labels' in globals()
+if have_louvain and have_greedy:
+    assert len(best_labels) == len(greedy_labels), "Label arrays must have same length"
+    y_louvain = np.asarray(best_labels)
+    y_greedy = np.asarray(greedy_labels)
+    metrics = {
+        'Rand': rand_score(y_louvain, y_greedy),
+        'Adjusted Rand (ARI)': adjusted_rand_score(y_louvain, y_greedy),
+        'Jaccard (pair-counting)': gcltr.jaccard_partition(y_louvain, y_greedy),
+        'NMI': normalized_mutual_info_score(y_louvain, y_greedy)
+    }
+    df_metrics = pd.DataFrame(metrics, index=['Louvain vs Greedy']).T
+    display(df_metrics)
+    print(f"Louvain communities: {len(np.unique(y_louvain))}, Greedy communities: {len(np.unique(y_greedy))}")
+else:
+    print("Skipping Louvain vs Greedy comparison:",
+          f"Louvain={'available' if have_louvain else 'missing'},",
+          f"Greedy={'available' if have_greedy else 'missing'}")
 
 # ---------------------------------------------
 #              Runtime Summary
