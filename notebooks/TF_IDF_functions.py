@@ -42,6 +42,7 @@ def getting_tf(input_files):
         tf_list.append(tf)
     return(tf_list)
 
+
 def getting_tf_idf(input_files):
     tf_list = getting_tf(input_files)
     idf_list = getting_idf(input_files)
