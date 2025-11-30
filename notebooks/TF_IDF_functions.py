@@ -42,13 +42,14 @@ def getting_tf(input_files):
         tf_list.append(tf)
     return(tf_list)
 
+
 def getting_tf_idf(input_files):
     tf_list = getting_tf(input_files)
     idf_list = getting_idf(input_files)
 
     tfidf_list = []
     for tf in tf_list:
-        tfidf = {word: tf[word]*idf_list[word] for word in tf}
+        tfidf = {word: tf.get(word, 0)*idf_list[word] for word in idf_list}
         tfidf_list.append(tfidf)
     
     return(tfidf_list)

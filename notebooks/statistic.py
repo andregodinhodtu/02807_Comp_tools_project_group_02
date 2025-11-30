@@ -9,38 +9,35 @@ import matplotlib.dates as mdates
 ################################################################################
 def analyze_clusters_statistics(hdf_file_path, n_keywords=5, min_cluster_size=10):
     """
-    Complete statistical and semantic analysis of clusters stored in the HDF5 file.
-    Includes fixes for empty clusters and numpy matrix type errors.
+    Complete statistical analysis of clusters.
+    Includes: Keywords (TF-IDF), Dominant Sign, IDs, and Concatenated Text.
     """
     print(f"Loading file: {hdf_file_path}...")
     try:
         df = pd.read_hdf(hdf_file_path, key='clusters')
-    except FileNotFoundError:
-        print("Error: File not found. Did you run the export first?")
+    except (FileNotFoundError, KeyError):
+        print("Error: File inaccessible or key not found.")
         return
 
-    # Basic text cleaning
+    # Basic cleaning
     df = df.dropna(subset=['horoscope'])
     
     # Filter out small clusters
     cluster_counts = df['cluster_label'].value_counts()
     valid_clusters = cluster_counts[cluster_counts >= min_cluster_size].index
     
-    # --- SAFETY CHECK ---
     if len(valid_clusters) == 0:
-        print(f"WARNING: No clusters found with size >= {min_cluster_size}.")
-        max_size = cluster_counts.max() if len(cluster_counts) > 0 else 0
-        print(f"   Largest cluster size found: {max_size}")
-        print("   -> Try calling the function with a lower 'min_cluster_size'.")
+        print(f" WARNING: No clusters found with size >= {min_cluster_size}.")
         return
-    # --------------------
 
     df_filtered = df[df['cluster_label'].isin(valid_clusters)]
-    print(f"Analyzing {len(valid_clusters)} significant clusters (size >= {min_cluster_size})")
+    print(f" Analyzing {len(valid_clusters)} significant clusters...")
 
-    # --- 1. SEMANTIC ANALYSIS (Cluster-based TF-IDF) ---
-    print("Calculating keywords (TF-IDF)...")
+    # --- 1. SEMANTIC ANALYSIS ---
+    print(" Calculating keywords & Aggregating text...")
     
+    # Group text by cluster (Concatenation happens here)
+    # This series acts as our 'Full Text' source
     cluster_texts = df_filtered.groupby('cluster_label')['horoscope'].apply(lambda x: " ".join(x))
     
     try:
@@ -48,11 +45,11 @@ def analyze_clusters_statistics(hdf_file_path, n_keywords=5, min_cluster_size=10
         tfidf_matrix = tfidf.fit_transform(cluster_texts)
         feature_names = np.array(tfidf.get_feature_names_out())
     except ValueError as e:
-        print(f"Skipping TF-IDF (insufficient data): {e}")
+        print(f" Skipping TF-IDF: {e}")
         return
 
     # --- 2. REPORT GENERATION ---
-    print("Generating report...")
+    print(" Generating detailed report...")
     
     results = []
     
@@ -69,9 +66,9 @@ def analyze_clusters_statistics(hdf_file_path, n_keywords=5, min_cluster_size=10
         if 'sign' in cluster_data.columns:
             top_sign_count = cluster_data['sign'].value_counts().head(1)
             if not top_sign_count.empty:
-                top_sign_name = top_sign_count.index[0]
-                top_sign_pct = (top_sign_count.values[0] / size) * 100
-                sign_info = f"{top_sign_name} ({top_sign_pct:.1f}%)"
+                sign_name = top_sign_count.index[0]
+                sign_pct = (top_sign_count.values[0] / size) * 100
+                sign_info = f"{sign_name} ({sign_pct:.1f}%)"
             else:
                 sign_info = "N/A"
         else:
@@ -79,31 +76,38 @@ def analyze_clusters_statistics(hdf_file_path, n_keywords=5, min_cluster_size=10
 
         # C. Representative Prediction (Medoid)
         texts = cluster_data['horoscope'].tolist()
-        
         if len(texts) == 1:
-            representative_text = texts[0]
+            rep_text = texts[0]
         else:
             try:
                 local_tfidf = TfidfVectorizer(stop_words='english')
-                local_matrix = local_tfidf.fit_transform(texts)
-                
-                # --- FIX: Convert matrix to array explicitly ---
-                centroid = np.asarray(local_matrix.mean(axis=0)) 
-                
-                similarities = cosine_similarity(local_matrix, centroid)
-                best_idx = similarities.argmax()
-                representative_text = texts[best_idx]
+                local_mat = local_tfidf.fit_transform(texts)
+                centroid = np.asarray(local_mat.mean(axis=0))
+                sims = cosine_similarity(local_mat, centroid)
+                rep_text = texts[sims.argmax()]
             except ValueError:
-                representative_text = texts[0]
+                rep_text = texts[0]
 
-        rep_short = representative_text[:100] + "..." 
+        rep_short = rep_text[:100] + "..." 
+        
+        # D. IDs List
+        if 'ID' in cluster_data.columns:
+            ids_str = ", ".join(map(str, cluster_data['ID'].tolist()))
+        else:
+            ids_str = ""
+
+        # E. Full Concatenated Text
+        # We retrieve it directly from our groupby object
+        full_text = cluster_texts[cluster_id]
 
         results.append({
             'Cluster ID': cluster_id,
             'Size': size,
             'Keywords': keywords,
             'Dominant Sign': sign_info,
-            'Representative Example': rep_short
+            'IDS': ids_str,
+            'Representative Example': rep_short,
+            'Full Text': full_text  # <--- New Column
         })
 
     # Display Results
@@ -112,11 +116,17 @@ def analyze_clusters_statistics(hdf_file_path, n_keywords=5, min_cluster_size=10
     print("\n" + "="*80)
     print(f"ANALYSIS RESULTS (Top 10 Clusters by size)")
     print("="*80)
-    print(df_report.sort_values('Size', ascending=False).head(10).to_string(index=False))
     
-    report_name = hdf_file_path.replace('.h5', '_report.csv')
+    # For display in Notebook, we hide the very long columns
+    cols_to_hide = ['Representative Example']
+    cols_to_show = [c for c in df_report.columns if c not in cols_to_hide]
+    
+    print(df_report[cols_to_show].sort_values('Size', ascending=False).head(10).to_string(index=False))
+    
+    # Export to CSV (Includreing Full Text and IDs)
+    report_name = hdf_file_path.replace('.h5', '_full_report.csv')
     df_report.to_csv(report_name, index=False)
-    print(f"\nComplete report saved to: {report_name}")
+    print(f"\n Report with FULL TEXT saved to: {report_name}")
 
 ###################################################################
 def plot_cluster_details(hdf_file_path, cluster_id):
