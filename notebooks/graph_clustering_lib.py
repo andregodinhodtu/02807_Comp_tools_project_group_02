@@ -52,8 +52,22 @@ def make_simmatrix_from_couples(
         else:
             df[sim_col] = 1.0
 
-    df = df[df[sim_col] >= threshold]
-    ids = pd.Index(df[id1_col].dropna()).append(pd.Index(df[id2_col].dropna())).unique()
+    # Keep only edges >= threshold
+    df = df[df[sim_col] >= threshold].copy()
+
+    # Canonicalize pairs to undirected (min, max) using a stable string-based key,
+    # then aggregate duplicates by maximum similarity to avoid double counting.
+    def _canon_pair(a, b):
+        pa = sorted([a, b], key=lambda x: str(x))
+        return pa[0], pa[1]
+
+    canon = df[[id1_col, id2_col]].apply(lambda r: _canon_pair(r[id1_col], r[id2_col]), axis=1)
+    df['u'] = [t[0] for t in canon]
+    df['v'] = [t[1] for t in canon]
+    df_agg = df.groupby(['u', 'v'], as_index=False)[sim_col].max()
+
+    # Build ID universe from aggregated pairs only
+    ids = pd.Index(df_agg['u'].dropna()).append(pd.Index(df_agg['v'].dropna())).unique()
     integer_like = False
     try:
         casted = np.array([int(x) for x in ids]); integer_like = True
@@ -74,19 +88,23 @@ def make_simmatrix_from_couples(
     id_to_index = {id_val: idx for idx, id_val in enumerate(id_list)}
     n = len(id_list)
     rows, cols, data = [], [], []
-    for _, row in df.iterrows():
-        a, b, val = row[id1_col], row[id2_col], row[sim_col]
+    for _, row in df_agg.iterrows():
+        a, b, val = row['u'], row['v'], row[sim_col]
         if pd.isna(a) or pd.isna(b) or pd.isna(val):
             continue
         if a not in id_to_index or b not in id_to_index:
             continue
         i, j = id_to_index[a], id_to_index[b]
+        if i == j:
+            # skip self-loops
+            continue
+        # Add one direction only; we'll symmetrize without summation
         rows.append(i); cols.append(j); data.append(val)
-        if i != j:
-            rows.append(j); cols.append(i); data.append(val)
     coo = sparse.coo_matrix((np.array(data, dtype=dtype), (np.array(rows), np.array(cols))), shape=(n, n))
     coo.sum_duplicates()
-    S = coo.tocsr()
+    # Symmetrize by taking maximum (not sum) to avoid doubling weights
+    S_upper = coo.tocsr()
+    S = S_upper.maximum(S_upper.T)
     return S, id_list, id_to_index
 
 
@@ -214,6 +232,73 @@ def visualize_graph(G, labels=None, title=None, hide_isolated=True,
     ax.set_axis_off()
     plt.tight_layout(); plt.show()
     return {'isolated_count': len(isolated_nodes), 'shown_nodes': nodes_to_plot, 'layout_k': layout_k}
+
+def pre_analyze_graph(G: nx.Graph, df: pd.DataFrame, subset_name: str,
+                      folder: str = "..\\pre_results\\clusters\\",
+                      top_k_visualize: int = 8,
+                      method_name: str = "components") -> Dict[str, Any]:
+    """Pre-analyze the graph before clustering.
+
+    - Detect connected components (treat directed graphs as undirected for components).
+    - Create a label array where each node's label is its component id.
+    - Export these component labels using export_clusters.
+    - Visualize only the largest components using visualize_graph.
+
+    Parameters
+    ----------
+    G : networkx.Graph
+        The graph to analyze.
+    df : pandas.DataFrame
+        Original dataframe with node metadata (must include 'ID').
+    subset_name : str
+        Name of the subset to use in export filename.
+    folder : str
+        Output folder for HDF5 export.
+    top_k_visualize : int
+        Number of largest components to visualize.
+    method_name : str
+        Label used in export filename, defaults to 'components'.
+
+    Returns
+    -------
+    dict with keys:
+        'labels' : np.ndarray of component labels aligned to sorted(G.nodes())
+        'component_sizes' : list of (label, size) sorted descending by size
+        'n_components' : int
+        'n_isolated' : int
+    """
+    H = G.to_undirected() if G.is_directed() else G
+    node_order = sorted(H.nodes())
+    idx_map = {n: i for i, n in enumerate(node_order)}
+
+    comps = list(nx.connected_components(H))
+    comps_sorted = sorted(comps, key=lambda s: len(s), reverse=True)
+    # Map each node to a component id
+    comp_id_by_node = {}
+    for cid, comp in enumerate(comps_sorted):
+        for n in comp:
+            comp_id_by_node[n] = cid
+    labels = np.array([comp_id_by_node.get(n, -1) for n in node_order], dtype=int)
+
+    # Component sizes summary
+    sizes = [(cid, len(comp)) for cid, comp in enumerate(comps_sorted)]
+
+    print(f"Pre-analyze: found {len(comps_sorted)} connected components. Largest sizes: {sizes[:5]}")
+
+    # Export as clusters (component labels)
+    export_clusters(df=df, labels=labels, node_ids=node_order,
+                    method_name=method_name, subset_name=subset_name, folder=folder)
+
+    # Visualize only the largest components
+    visualize_graph(H, labels=labels, title=f"Top {top_k_visualize} components by size | method : {method_name} | subset : {subset_name}",
+                    nb_clusters=top_k_visualize)
+
+    return {
+        'labels': labels,
+        'component_sizes': sizes,
+        'n_components': len(comps_sorted),
+        'n_isolated': sum(1 for comp in comps_sorted if len(comp) == 1)
+    }
 
 def export_clusters(df, labels, node_ids, method_name, subset_name="horoscope_full", folder="..\\pre_results\\clusters\\"):
     """

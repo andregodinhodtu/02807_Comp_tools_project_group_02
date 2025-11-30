@@ -24,14 +24,20 @@ input_method = 0
 # 0 for MinHashing matrix
 # 1 for Frequent Itemsets matrix
 # 2 for Random graph
-subset_idd = "wellness"
+
+# MinHashing input
+subset_idd = "love"
 input_file_name = f"similarity_{subset_idd}_lsh"  # MinHashing
+
+# Frequent Itemsets input
+# input_file_name = "shared_2_itemsets_pairs"  # Frequent Itemsets
 # input_file_name = "shared_2_itemsets_pairs" # Frequent Itemsets
 # !! be sure to set the correct input_file_name according to input_method !!
 
 threshold = 0.3 # edges with weight below this value will be ignored
 methods = [ # select the methods you want to run by commenting
-    'louvain',
+    'components',
+    # 'louvain',
     # 'girvan_newman',
     'greedy',
 ]
@@ -39,7 +45,7 @@ plot_graph = False
 pre_visualization = False
 
 # Number of largest clusters to plot (when labels available)
-nb_clusters_to_plot = 8
+nb_clusters_to_plot = 30
 
 # Dictionary to store runtimes for each method
 method_runtimes = {}
@@ -50,7 +56,7 @@ method_runtimes = {}
 
 # MinHashing
 if input_method == 0:
-    df_minhash = pd.read_csv(f'..\\pre_results\\{input_file_name}.csv')
+    df_minhash = pd.read_csv(f'..\\pre_results\\minhashing\\{input_file_name}.csv')
     print(df_minhash.head())
     M_thr, id_list, id_to_index = gcltr.make_simmatrix_from_couples(
         df_minhash,
@@ -104,6 +110,24 @@ if pre_visualization:
 
 # Global node order for consistent labeling/exports
 node_order = sorted(G.nodes())
+
+# ---------------------------------------------
+#           Pre-Analyze: Components
+# ---------------------------------------------
+if 'components' in methods:
+    print("\n--- Pre-analyze graph (components) ---")
+    try:
+        pre_info = gcltr.pre_analyze_graph(
+            G=G,
+            df=df,
+            subset_name=subset_idd,
+            folder="..\\pre_results\\clusters\\",
+            top_k_visualize=nb_clusters_to_plot,
+            method_name="components"
+        )
+        print(f"Components found: {pre_info['n_components']}")
+    except Exception as e:
+        print("Pre-analyze failed:", e)
 
 # ---------------------------------------------
 #             Louvain Clustering
@@ -160,6 +184,7 @@ if 'louvain' in methods:
 #            Girvan-Newman Clustering
 # ---------------------------------------------
 if 'girvan_newman' in methods:
+    assert 0==1,"Don't run girvan newman, it's too long"
     gn_result = gcltr.run_gn_select_by_modularity(G, max_levels=30, weight='weight')
     node_order = sorted(G.nodes())
 
@@ -249,6 +274,8 @@ if have_louvain and have_greedy:
     df_metrics = pd.DataFrame(metrics, index=['Louvain vs Greedy']).T
     display(df_metrics)
     print(f"Louvain communities: {len(np.unique(y_louvain))}, Greedy communities: {len(np.unique(y_greedy))}")
+    # save comparison in csv file
+    df_metrics.to_csv(f"..\\pre_results\\clusters\\{subset_idd}_louvain_vs_greedy.csv")
 else:
     print("Skipping Louvain vs Greedy comparison:",
           f"Louvain={'available' if have_louvain else 'missing'},",
@@ -260,3 +287,5 @@ else:
 print("\n--- Runtime Summary ---")
 for m, rt in method_runtimes.items():
     print(f"{m}: {rt:.2f} s")
+
+# %%
