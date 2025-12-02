@@ -142,3 +142,21 @@ def cosine_similarity(vec_a, vec_b):
         return 0 
     
     return(dot_product/norm_product)
+
+
+def predict_cat(cat_dict, test_vector, categories): 
+
+    max_similarity = -1.0
+    predicted_cat = None
+
+    for cat in cat_dict:
+        ref_cat = cat[categories]
+        ref_vector = cat['cosine_vect']
+
+        similarity = cosine_similarity(ref_vector, test_vector)
+
+        if similarity > max_similarity:
+            max_similarity = similarity
+            predicted_cat = ref_cat
+
+    return predicted_cat, max_similarity
