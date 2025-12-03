@@ -285,6 +285,12 @@ def pre_analyze_graph(G: nx.Graph, df: pd.DataFrame, subset_name: str,
 
     print(f"Pre-analyze: found {len(comps_sorted)} connected components. Largest sizes: {sizes[:5]}")
 
+    # Modularity of the components partition
+    if H.number_of_edges() == 0:
+        Q_components = 0.0
+    else:
+        Q_components = modularity(H, tuple(comps_sorted), weight='weight')
+
     # Export as clusters (component labels)
     export_clusters(df=df, labels=labels, node_ids=node_order,
                     method_name=method_name, subset_name=subset_name, folder=folder)
@@ -297,6 +303,7 @@ def pre_analyze_graph(G: nx.Graph, df: pd.DataFrame, subset_name: str,
         'labels': labels,
         'component_sizes': sizes,
         'n_components': len(comps_sorted),
+        'Q': Q_components,
         'n_isolated': sum(1 for comp in comps_sorted if len(comp) == 1)
     }
 
@@ -441,7 +448,6 @@ def run_greedy(G: nx.Graph, weight='weight'):
 
     # Compute modularity of the greedy solution
     Q_gm = modularity(H, gm_comms, weight='weight')
-    print(f"Greedy Modularity: Q={Q_gm:.4f}, communities={len(gm_comms)}")
     return {'communities': gm_comms, 'labels': gm_labels, 'Q': Q_gm}
 
 # ---------------------------------------------
