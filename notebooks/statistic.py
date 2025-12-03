@@ -1,10 +1,12 @@
 import os
 import numpy as np
 import pandas as pd
+import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import matplotlib.dates as mdates
+from collections import Counter
 
 ################################################################################
 def analyze_clusters_statistics(hdf_file_path, n_keywords=5, min_cluster_size=10):
@@ -278,3 +280,279 @@ def add_advanced_statistics(hdf_file_path, min_cluster_size=10):
     display(stats_df.head(10))
     
     return stats_df
+
+#########################################################################
+def generate_simple_copy_table(base_data_path, reports_folder_path):
+    """
+    Generates a table of copies assuming that (Copies = Cluster Size - 1).
+    """
+    
+    # --- 1. Retrieve totals per category (the denominator) ---
+    print("Calculating reference totals...")
+    try:
+        df_base = pd.read_csv(base_data_path)
+        # Count how many 'career', 'love', etc. horoscopes there are in total
+        cat_counts = df_base['category'].value_counts().to_dict()
+        cat_counts['full'] = len(df_base) # The entire dataset
+    except Exception as e:
+        print(f"Error loading base data: {e}")
+        return
+
+    # --- 2. Loop over result files ---
+    categories = ['career', 'general', 'love', 'wellness', 'full']
+    # Adapt this list to the methods you actually executed
+    methods = ['louvain', 'greedy', 'components'] 
+    
+    results = []
+
+    print("Calculating copies...")
+    for cat in categories:
+        total_in_category = cat_counts.get(cat, 0)
+        
+        for method in methods:
+            # Filename generated in the previous step
+            filename = f"{cat}_{method}_full_report.csv"
+            filepath = os.path.join(reports_folder_path, filename)
+            
+            nb_copies = 0
+            
+            if os.path.exists(filepath):
+                try:
+                    # Read only necessary columns for speed
+                    df_report = pd.read_csv(filepath, usecols=['Size'])
+                    
+                    # --- SIMPLIFIED FORMULA ---
+                    # Sum of (Size - 1) for all clusters
+                    # If size=1, copies=0. If size=10, copies=9.
+                    if not df_report.empty:
+                        # Ensure no sizes < 1
+                        nb_copies = (df_report['Size'] - 1).clip(lower=0).sum()
+                        
+                except Exception as e:
+                    print(f"Error reading {filename}: {e}")
+            
+            # Calculate rate (%)
+            rate = (nb_copies / total_in_category * 100) if total_in_category > 0 else 0
+
+            results.append({
+                'Category': cat,
+                'Method': method,
+                'Total_Items': total_in_category,
+                'Copies_Count': nb_copies,
+                'Repetition_Rate': round(rate, 2)
+            })
+
+    # --- 3. Create Pivot Tables (Clean display) ---
+    df_res = pd.DataFrame(results)
+
+    # Table 1: Absolute number of copies
+    pivot_count = df_res.pivot(index='Category', columns='Method', values='Copies_Count')
+    
+    # Table 2: Repetition rate in %
+    pivot_rate = df_res.pivot(index='Category', columns='Method', values='Repetition_Rate')
+
+    print("\n" + "="*60)
+    print("NUMBER OF COPIES (Based on cluster size)")
+    print("="*60)
+    display(pivot_count)
+    
+    print("\n" + "="*60)
+    print("REPETITION RATE (%)")
+    print("="*60)
+    display(pivot_rate)
+    
+    return pivot_count, pivot_rate
+
+###############################################################################
+def analyze_components_victimization(base_data_path, reports_folder_path):
+    """
+    Calculates the recycling rate per sign ONLY for the 'components' method.
+    Logic: In a cluster, if a sign appears N times, Copies = N - 1.
+    """
+    
+    print(" Starting targeted analysis ('components' method)...")
+
+    # --- 1. Load Reference Data (ID -> Sign) ---
+    try:
+        df_base = pd.read_csv(base_data_path)
+        id_to_sign = dict(zip(df_base['ID'], df_base['sign']))
+        
+        # Denominators: How many times each sign appears total per category
+        # Prepare a nested dict: totals[category][sign]
+        totals = {}
+        
+        # For standard categories
+        for cat in df_base['category'].unique():
+            totals[cat] = df_base[df_base['category'] == cat]['sign'].value_counts().to_dict()
+            
+        # For 'full' category (entire dataset)
+        totals['full'] = df_base['sign'].value_counts().to_dict()
+        
+    except Exception as e:
+        print(f"Error loading base data: {e}")
+        return
+
+    # --- 2. Analyze 'components' reports ---
+    categories = ['career', 'general', 'love', 'wellness', 'full']
+    method = 'components' # Force this method
+    
+    results_list = []
+
+    for cat in categories:
+        filename = f"{cat}_{method}_full_report.csv"
+        filepath = os.path.join(reports_folder_path, filename)
+        
+        if not os.path.exists(filepath):
+            print(f"Missing file: {filename}")
+            continue
+            
+        print(f" Analyzing: {filename}")
+        
+        try:
+            df_report = pd.read_csv(filepath)
+            
+            # Copy counter for this category
+            # ex: {'aries': 50, 'taurus': 12...}
+            cat_copy_counts = Counter()
+            
+            # Iterate through clusters
+            for _, row in df_report.iterrows():
+                if pd.isna(row['IDS']): continue
+                
+                # Retrieve cluster IDs
+                ids_str = str(row['IDS'])
+                if not ids_str: continue
+                
+                cluster_ids = [int(x) for x in ids_str.split(',')]
+                
+                # Convert IDs -> Signs
+                cluster_signs = [id_to_sign.get(i) for i in cluster_ids if i in id_to_sign]
+                
+                # Count occurrences WITHIN this cluster
+                # ex: {'aries': 3, 'leo': 1}
+                sign_counts_in_cluster = Counter(cluster_signs)
+                
+                # Apply rule: Duplicates = n - 1
+                for sign, n in sign_counts_in_cluster.items():
+                    if n > 1:
+                        cat_copy_counts[sign] += (n - 1)
+            
+            # Calculate percentages for this category
+            for sign in df_base['sign'].unique():
+                n_total = totals.get(cat, {}).get(sign, 0)
+                n_copies = cat_copy_counts.get(sign, 0)
+                
+                if n_total > 0:
+                    rate = (n_copies / n_total) * 100
+                else:
+                    rate = 0.0
+                
+                results_list.append({
+                    'Category': cat,
+                    'Sign': sign,
+                    'Total_Horoscopes': n_total,
+                    'Detected_Copies': n_copies,
+                    'Victimization_Rate': round(rate, 2)
+                })
+                
+        except Exception as e:
+            print(f"Error on {filename}: {e}")
+
+    # --- 3. Create Final Table ---
+    df_res = pd.DataFrame(results_list)
+    
+    # Pivot for display (Rows: Signs, Columns: Categories)
+    pivot_table = df_res.pivot(index='Sign', columns='Category', values='Victimization_Rate')
+    
+    # Add an average for sorting
+    pivot_table['Average'] = pivot_table.mean(axis=1)
+    pivot_table = pivot_table.sort_values('Average', ascending=False)
+    
+    print("\n" + "="*80)
+    print("VICTIMIZATION RATE (INTRA-SIGN RECYCLING) - COMPONENTS METHOD")
+    print("="*80)
+    display(pivot_table.style.background_gradient(cmap='Reds', vmin=0, vmax=100).format("{:.2f}%"))
+    
+    # Optional: Show raw counts for verification
+    # pivot_counts = df_res.pivot(index='Sign', columns='Category', values='Detected_Copies')
+    # display(pivot_counts)
+
+    return df_res
+
+###############################################################################
+def plot_small_clusters_distribution(reports_folder_path):
+    """
+    Displays 3 histograms (one per method) showing the distribution 
+    of cluster sizes (1 to 10) for each category.
+    """
+    # Parameters
+    categories = ['career', 'general', 'love', 'wellness', 'full']
+    methods = ['louvain', 'greedy', 'components'] # Add 'girvan_newman' if necessary
+    max_size_x = 10 # Cut off X-axis at 10 as requested
+
+    # Style configuration
+    sns.set_theme(style="whitegrid")
+    
+    # Create one figure per method
+    # We could use 3 subplots, but separate figures are more readable here
+    
+    for method in methods:
+        print(f" Generating chart for method: {method.upper()}...")
+        
+        # 1. Compile data for this method
+        data_for_plot = []
+        
+        for cat in categories:
+            filename = f"{cat}_{method}_full_report.csv"
+            filepath = os.path.join(reports_folder_path, filename)
+            
+            if os.path.exists(filepath):
+                try:
+                    df = pd.read_csv(filepath, usecols=['Size'])
+                    
+                    # Keep only small clusters (<= 10)
+                    df_small = df[df['Size'] <= max_size_x].copy()
+                    
+                    if not df_small.empty:
+                        df_small['Category'] = cat # For grouping (hue)
+                        data_for_plot.append(df_small)
+                        
+                except Exception as e:
+                    pass # Ignore reading errors
+        
+        if not data_for_plot:
+            print(f" No data found for method {method}.")
+            continue
+
+        # Merge data
+        df_combined = pd.concat(data_for_plot, ignore_index=True)
+        
+        # 2. Create Plot
+        plt.figure(figsize=(14, 6))
+        
+        # countplot automatically counts occurrences for each X
+        # hue='Category' creates grouped bars side-by-side
+        ax = sns.countplot(
+            data=df_combined, 
+            x='Size', 
+            hue='Category', 
+            palette='viridis',
+            edgecolor='black',
+            alpha=0.9
+        )
+        
+        # 3. Formatting
+        plt.title(f"Small Cluster Size Distribution (1-{max_size_x}) - Method: {method.upper()}", fontsize=16, fontweight='bold', pad=20)
+        plt.xlabel("Cluster Size (Number of horoscopes)", fontsize=12)
+        plt.ylabel("Number of Clusters (Frequency)", fontsize=12)
+        
+        # Legend and grid
+        plt.legend(title='Category', bbox_to_anchor=(1.02, 1), loc='upper left')
+        plt.grid(axis='y', linestyle='--', alpha=0.7)
+        
+        # Add values on bars (optional, for readability)
+        for container in ax.containers:
+            ax.bar_label(container, fontsize=8, padding=2)
+
+        plt.tight_layout()
+        plt.show()

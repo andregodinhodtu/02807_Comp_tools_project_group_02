@@ -126,6 +126,9 @@ if 'components' in methods:
             method_name="components"
         )
         print(f"Components found: {pre_info['n_components']}")
+        # Print modularity of the components partition
+        if 'Q' in pre_info:
+            print(f"Components Modularity Q: {pre_info['Q']:.4f}")
     except Exception as e:
         print("Pre-analyze failed:", e)
 
@@ -146,6 +149,7 @@ if 'louvain' in methods:
     best_aris = gcltr.robustness_ari(results, best['resolution'], G)
     print(f"Best resolution: {best['resolution']}, modularity={best['modularity']:.4f}, communities={best['n_comm']}")
     print(f"Robustness (ARI mean ± std at best resolution): {np.mean(best_aris):.3f} ± {np.std(best_aris):.3f}")
+    print(f"Louvain Modularity Q: {best['modularity']:.4f}")
 
     print("\nResolution  | Modularity(mean±std) | Avg #Communities")
     for r, vals in summary.items():
@@ -237,6 +241,7 @@ if 'greedy' in methods:
     gm_comms = greedy_result['communities']
     greedy_labels = greedy_result['labels']
     Q_gm = greedy_result['Q']
+    print(f"Greedy Modularity Q: {Q_gm:.4f}; communities={len(gm_comms)}")
     # Visualize
     gcltr.visualize_graph(G, greedy_labels, title=f"Greedy Modularity partition (Q={Q_gm:.3f}, k={len(gm_comms)})", nb_clusters=nb_clusters_to_plot)
 
