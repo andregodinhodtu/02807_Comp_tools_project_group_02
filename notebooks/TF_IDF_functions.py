@@ -4,6 +4,7 @@ import numpy as np
 import string
 import matplotlib.pyplot as plt
 from collections import Counter
+from numpy.linalg import norm
 
 def clean_text(text):
 
@@ -96,3 +97,66 @@ def final_prediction_cleaner(text_prediction, stop_words_set):
     filtered_words = [word for word in words if word not in stop_words_set]
     
     return " ".join(filtered_words)
+
+# def cosine_similarity_numpy(vec_a, vec_b):
+#     #implement cosine similarity between two same-sized vector stored in an numpy array
+
+#     dot_product = np.dot(vec_a, vec_b)
+
+#     norm_product = norm(vec_a) * norm(vec_b)
+
+#     #to avoid dividing by 0
+#     if norm_product == 0:
+#         return 0.0
+    
+#     return dot_product / norm_product
+# It is computationally acceptable to use the version with loops so let's stick to it
+
+
+def cosine_similarity(vec_a, vec_b):
+    #implement cosine similarity between two same-sized vector stored in an numpy array
+
+    if len(vec_a) != len(vec_b):
+        raise ValueError("Vectors should be of same dimension.")
+    
+    dot_product = 0
+    for i in range(len(vec_a)):
+        dot_product += vec_a[i] * vec_b[i]
+
+    #norm of vector a
+    sum_of_squares_a = 0
+    for elt in vec_a:
+        sum_of_squares_a += elt ** 2
+    norm_a = math.sqrt(sum_of_squares_a)
+
+    #norm of vector b
+    sum_of_squares_b = 0
+    for elt in vec_b:
+        sum_of_squares_b += elt ** 2
+    norm_b = math.sqrt(sum_of_squares_b)
+
+    norm_product = norm_a * norm_b
+
+    #to avoid dividing by 0
+    if norm_product == 0:
+        return 0 
+    
+    return(dot_product/norm_product)
+
+
+def predict_cat(cat_dict, test_vector, categories): 
+
+    max_similarity = -1.0
+    predicted_cat = None
+
+    for cat in cat_dict:
+        ref_cat = cat[categories]
+        ref_vector = cat['cosine_vect']
+
+        similarity = cosine_similarity(ref_vector, test_vector)
+
+        if similarity > max_similarity:
+            max_similarity = similarity
+            predicted_cat = ref_cat
+
+    return predicted_cat, max_similarity
