@@ -26,7 +26,7 @@ from sklearn.metrics import adjusted_rand_score
 from itertools import combinations
 
 # ---------------------------------------------
-#    horoscope-extracted graph - MinHashing
+#    horoscope-extracted graph
 # ---------------------------------------------
 def make_simmatrix_from_couples(
     df: pd.DataFrame,
@@ -233,81 +233,7 @@ def visualize_graph(G, labels=None, title=None, hide_isolated=True,
     plt.tight_layout(); plt.show()
     return {'isolated_count': len(isolated_nodes), 'shown_nodes': nodes_to_plot, 'layout_k': layout_k}
 
-def pre_analyze_graph(G: nx.Graph, df: pd.DataFrame, subset_name: str,
-                      folder: str = "..\\pre_results\\clusters\\",
-                      top_k_visualize: int = 8,
-                      method_name: str = "components") -> Dict[str, Any]:
-    """Pre-analyze the graph before clustering.
-
-    - Detect connected components (treat directed graphs as undirected for components).
-    - Create a label array where each node's label is its component id.
-    - Export these component labels using export_clusters.
-    - Visualize only the largest components using visualize_graph.
-
-    Parameters
-    ----------
-    G : networkx.Graph
-        The graph to analyze.
-    df : pandas.DataFrame
-        Original dataframe with node metadata (must include 'ID').
-    subset_name : str
-        Name of the subset to use in export filename.
-    folder : str
-        Output folder for HDF5 export.
-    top_k_visualize : int
-        Number of largest components to visualize.
-    method_name : str
-        Label used in export filename, defaults to 'components'.
-
-    Returns
-    -------
-    dict with keys:
-        'labels' : np.ndarray of component labels aligned to sorted(G.nodes())
-        'component_sizes' : list of (label, size) sorted descending by size
-        'n_components' : int
-        'n_isolated' : int
-    """
-    H = G.to_undirected() if G.is_directed() else G
-    node_order = sorted(H.nodes())
-    idx_map = {n: i for i, n in enumerate(node_order)}
-
-    comps = list(nx.connected_components(H))
-    comps_sorted = sorted(comps, key=lambda s: len(s), reverse=True)
-    # Map each node to a component id
-    comp_id_by_node = {}
-    for cid, comp in enumerate(comps_sorted):
-        for n in comp:
-            comp_id_by_node[n] = cid
-    labels = np.array([comp_id_by_node.get(n, -1) for n in node_order], dtype=int)
-
-    # Component sizes summary
-    sizes = [(cid, len(comp)) for cid, comp in enumerate(comps_sorted)]
-
-    print(f"Pre-analyze: found {len(comps_sorted)} connected components. Largest sizes: {sizes[:5]}")
-
-    # Modularity of the components partition
-    if H.number_of_edges() == 0:
-        Q_components = 0.0
-    else:
-        Q_components = modularity(H, tuple(comps_sorted), weight='weight')
-
-    # Export as clusters (component labels)
-    export_clusters(df=df, labels=labels, node_ids=node_order,
-                    method_name=method_name, subset_name=subset_name, folder=folder)
-
-    # Visualize only the largest components
-    visualize_graph(H, labels=labels, title=f"Top {top_k_visualize} components by size | method : {method_name} | subset : {subset_name}",
-                    nb_clusters=top_k_visualize)
-
-    return {
-        'labels': labels,
-        'component_sizes': sizes,
-        'n_components': len(comps_sorted),
-        'Q': Q_components,
-        'n_isolated': sum(1 for comp in comps_sorted if len(comp) == 1)
-    }
-
-def export_clusters(df, labels, node_ids, method_name, subset_name="horoscope_full", folder="..\\pre_results\\clusters\\"):
+def export_clusters(df, labels, node_ids, method_name, subset_name="horoscope_full", folder="..\\pre_results\\clusters\\", threshold=None):
     """
     Export clusters into a single HDF5 file for the given method.
 
@@ -336,7 +262,7 @@ def export_clusters(df, labels, node_ids, method_name, subset_name="horoscope_fu
     result_df = result_df[cols].sort_values(by=['cluster_label', 'ID'])
 
     # 4. Save to HDF5
-    filename = f"{folder}{subset_name}_{method_name}.h5"
+    filename = f"{folder}{subset_name}_{method_name}_{threshold}.h5"
 
     # format='table' and data_columns=True enable SQL-like queries later
     # e.g., pd.read_hdf(..., where='cluster_label == 5')
@@ -348,6 +274,140 @@ def export_clusters(df, labels, node_ids, method_name, subset_name="horoscope_fu
 
     # Small preview
     return result_df.head()
+
+def least_connected_pairs_from_h5(h5_path: str, G: nx.Graph, output_csv_path: str,
+                                  key: str = 'clusters', weight_attr: str = 'weight') -> None:
+    """Read a clustering HDF5 file and write, for each cluster of size >= 3,
+    the least-connected pair of horoscopes (IDs) and their similarity measure.
+
+    Similarity measure is defined as the bottleneck connectivity between the two nodes:
+    - If nodes are connected, it is the minimum edge weight along the path between them
+      (which equals the minimum edge on the path in the maximum spanning tree).
+    - If there is no path between them within the cluster subgraph, it is 0.
+
+    Outputs a CSV with columns: 'Edge Weight', 'ID1', 'ID2', 'Cluster Label'.
+
+    Parameters
+    ----------
+    h5_path : str
+        Path to the HDF5 file produced by export_clusters.
+    G : networkx.Graph
+        The graph containing edge weights.
+    output_csv_path : str
+        Destination path for the output CSV file.
+    key : str
+        HDF5 key used when saving (default 'clusters').
+    weight_attr : str
+        Edge attribute name that stores weight (default 'weight').
+    """
+    # Load clustering result
+    df_clusters = pd.read_hdf(h5_path, key=key)
+    # Ensure expected columns
+    if 'ID' not in df_clusters.columns or 'cluster_label' not in df_clusters.columns:
+        raise ValueError("HDF5 must contain 'ID' and 'cluster_label' columns")
+
+    # Group by cluster_label
+    grouped = df_clusters.groupby('cluster_label')['ID'].apply(list)
+
+    rows = []
+    for clabel, ids in grouped.items():
+        if len(ids) < 3:
+            continue  # ignore singletons and couples
+        # Build subgraph induced by ids
+        Hc = G.subgraph(ids).copy()
+        # If disconnected: choose any pair from different components, weight=0
+        comps = list(nx.connected_components(Hc.to_undirected() if Hc.is_directed() else Hc))
+        if len(comps) > 1:
+            # Pick first two components and first nodes from each
+            a = next(iter(comps[0]))
+            b = next(iter(comps[1]))
+            rows.append({'ID1': a, 'ID2': b, 'Cluster Label': clabel, 'Edge Weight': 0.0})
+            continue
+
+        # Connected: use maximum spanning tree to get bottleneck
+        Hc_u = Hc.to_undirected() if Hc.is_directed() else Hc
+        # NetworkX maximum_spanning_tree uses 'weight' attr by default; map if different
+        if weight_attr != 'weight':
+            # Relabel edge attribute to 'weight' on a copy
+            Htmp = nx.Graph()
+            Htmp.add_nodes_from(Hc_u.nodes(data=True))
+            for u, v, d in Hc_u.edges(data=True):
+                w = float(d.get(weight_attr, 0.0))
+                Htmp.add_edge(u, v, weight=w)
+            Hc_u = Htmp
+        MST = nx.maximum_spanning_tree(Hc_u, weight='weight')
+        # Find the global minimum edge in the MST
+        min_w = None
+        min_edge = None
+        for u, v, d in MST.edges(data=True):
+            w = float(d.get('weight', 0.0))
+            if (min_w is None) or (w < min_w):
+                min_w = w
+                min_edge = (u, v)
+        if min_edge is not None:
+            rows.append({'ID1': min_edge[0], 'ID2': min_edge[1], 'Cluster Label': clabel, 'similarity estimation': float(min_w)})
+
+    # Write CSV
+    out_df = pd.DataFrame(rows, columns=['ID1', 'ID2', 'Cluster Label', 'similarity estimation'])
+    out_df.to_csv(output_csv_path, index=False)
+    print(f"Written least-connected pairs CSV to: {output_csv_path}")
+
+# ---------------------------------------------
+#           Spot Existing Clusters
+# ---------------------------------------------
+def pre_analyze_graph(G: nx.Graph) -> Dict[str, Any]:
+    """Pre-analyze the graph before clustering.
+
+    - Detect connected components (treat directed graphs as undirected for components).
+    - Create a label array where each node's label is its component id.
+    - Export these component labels using export_clusters.
+    - Visualize only the largest components using visualize_graph.
+
+    Parameters
+    ----------
+    G : networkx.Graph
+        The graph to analyze.
+
+    Returns
+    -------
+    dict with keys:
+        'labels' : np.ndarray of component labels aligned to sorted(G.nodes())
+        'component_sizes' : list of (label, size) sorted descending by size
+        'n_components' : int
+        'n_isolated' : int
+    """
+    H = G.to_undirected() if G.is_directed() else G
+    node_order = sorted(H.nodes())
+    idx_map = {n: i for i, n in enumerate(node_order)}
+
+    comps = list(nx.connected_components(H))
+    comps_sorted = sorted(comps, key=lambda s: len(s), reverse=True)
+    # Map each node to a component id
+    comp_id_by_node = {}
+    for cid, comp in enumerate(comps_sorted):
+        for n in comp:
+            comp_id_by_node[n] = cid
+    labels = np.array([comp_id_by_node.get(n, -1) for n in node_order], dtype=int)
+
+    # Component sizes summary
+    sizes = [len(comp) for comp in comps_sorted]
+
+    print(f"Pre-analyze: found {len(comps_sorted)} connected components. Largest sizes: {sizes[:5]}")
+
+    # Modularity of the components partition
+    if H.number_of_edges() == 0:
+        Q_components = 0.0
+    else:
+        Q_components = modularity(H, tuple(comps_sorted), weight='weight')
+
+    return {
+        'labels': labels,
+        'component_sizes': sizes,
+        'n_components': len(comps_sorted),
+        'Q': Q_components,
+        'n_isolated': sum(1 for comp in comps_sorted if len(comp) == 1)
+    }
+
 
 # ---------------------------------------------
 #              Louvain Clustering
@@ -434,7 +494,7 @@ def run_gn_select_by_modularity(G, max_levels=20, weight='weight'):
 # ---------------------------------------------
 #              Greedy Clustering
 # ---------------------------------------------
-def run_greedy(G: nx.Graph, weight='weight'):
+def run_greedy(G: nx.Graph):
     """Run greedy modularity maximization clustering."""
     # Ensure we have an undirected view for modularity computation
     H = G.to_undirected() if G.is_directed() else G
@@ -473,4 +533,3 @@ def jaccard_partition(y1, y2):
     if total_pairs == D:
         return 0.0
     return S / (total_pairs - D)
-
