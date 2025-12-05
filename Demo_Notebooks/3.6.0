@@ -1,0 +1,42 @@
+Collecting tables
+  Downloading tables-3.10.2-cp312-cp312-win_amd64.whl.metadata (2.1 kB)
+Requirement already satisfied: numpy>=1.20.0 in c:\users\maxma\appdata\local\programs\python\python312\lib\site-packages (from tables) (2.3.3)
+Collecting numexpr>=2.6.2 (from tables)
+  Downloading numexpr-2.14.1-cp312-cp312-win_amd64.whl.metadata (9.3 kB)
+Requirement already satisfied: packaging in c:\users\maxma\appdata\roaming\python\python312\site-packages (from tables) (25.0)
+Collecting py-cpuinfo (from tables)
+  Downloading py_cpuinfo-9.0.0-py3-none-any.whl.metadata (794 bytes)
+Collecting blosc2>=2.3.0 (from tables)
+  Downloading blosc2-3.12.2-cp312-cp312-win_amd64.whl.metadata (7.1 kB)
+Requirement already satisfied: typing-extensions>=4.4.0 in c:\users\maxma\appdata\local\programs\python\python312\lib\site-packages (from tables) (4.15.0)
+Collecting ndindex (from blosc2>=2.3.0->tables)
+  Downloading ndindex-1.10.1-cp312-cp312-win_amd64.whl.metadata (3.7 kB)
+Collecting msgpack (from blosc2>=2.3.0->tables)
+  Downloading msgpack-1.1.2-cp312-cp312-win_amd64.whl.metadata (8.4 kB)
+Requirement already satisfied: platformdirs in c:\users\maxma\appdata\roaming\python\python312\site-packages (from blosc2>=2.3.0->tables) (4.4.0)
+Collecting requests (from blosc2>=2.3.0->tables)
+  Downloading requests-2.32.5-py3-none-any.whl.metadata (4.9 kB)
+Collecting charset_normalizer<4,>=2 (from requests->blosc2>=2.3.0->tables)
+  Downloading charset_normalizer-3.4.4-cp312-cp312-win_amd64.whl.metadata (38 kB)
+Collecting idna<4,>=2.5 (from requests->blosc2>=2.3.0->tables)
+  Downloading idna-3.11-py3-none-any.whl.metadata (8.4 kB)
+Collecting urllib3<3,>=1.21.1 (from requests->blosc2>=2.3.0->tables)
+  Downloading urllib3-2.6.0-py3-none-any.whl.metadata (6.6 kB)
+Collecting certifi>=2017.4.17 (from requests->blosc2>=2.3.0->tables)
+  Downloading certifi-2025.11.12-py3-none-any.whl.metadata (2.5 kB)
+Downloading tables-3.10.2-cp312-cp312-win_amd64.whl (6.4 MB)
+   ---------------------------------------- 0.0/6.4 MB ? eta -:--:--   ---------------------- ----------------- 3.7/6.4 MB 19.8 MB/s eta 0:00:01   ---------------------------------------- 6.4/6.4 MB 20.6 MB/s  0:00:00
+Downloading blosc2-3.12.2-cp312-cp312-win_amd64.whl (2.3 MB)
+   ---------------------------------------- 0.0/2.3 MB ? eta -:--:--   ---------------------------------------- 2.3/2.3 MB 25.7 MB/s  0:00:00
+Downloading numexpr-2.14.1-cp312-cp312-win_amd64.whl (160 kB)
+Downloading msgpack-1.1.2-cp312-cp312-win_amd64.whl (72 kB)
+Downloading ndindex-1.10.1-cp312-cp312-win_amd64.whl (158 kB)
+Downloading py_cpuinfo-9.0.0-py3-none-any.whl (22 kB)
+Downloading requests-2.32.5-py3-none-any.whl (64 kB)
+Downloading charset_normalizer-3.4.4-cp312-cp312-win_amd64.whl (107 kB)
+Downloading idna-3.11-py3-none-any.whl (71 kB)
+Downloading urllib3-2.6.0-py3-none-any.whl (131 kB)
+Downloading certifi-2025.11.12-py3-none-any.whl (159 kB)
+Installing collected packages: py-cpuinfo, urllib3, numexpr, ndindex, msgpack, idna, charset_normalizer, certifi, requests, blosc2, tables
+   ----------------------------------------  0/11 [py-cpuinfo]   ----------------------------------------  0/11 [py-cpuinfo]   --- ------------------------------------  1/11 [urllib3]   --- ------------------------------------  1/11 [urllib3]   --- ------------------------------------  1/11 [urllib3]   --- ------------------------------------  1/11 [urllib3]   --- ------------------------------------  1/11 [urllib3]   ------- --------------------------------  2/11 [numexpr]   ------- --------------------------------  2/11 [numexpr]   ---------- -----------------------------  3/11 [ndindex]   ---------- -----------------------------  3/11 [ndindex]   ---------- -----------------------------  3/11 [ndindex]   ---------- -----------------------------  3/11 [ndindex]   ---------- -----------------------------  3/11 [ndindex]   ------------------ ---------------------  5/11 [idna]   ------------------ ---------------------  5/11 [idna]   --------------------- ------------------  6/11 [charset_normalizer]   --------------------- ------------------  6/11 [charset_normalizer]   ------------------------- --------------  7/11 [certifi]   ----------------------------- ----------  8/11 [requests]   ----------------------------- ----------  8/11 [requests]   ----------------------------- ----------  8/11 [requests]   -------------------------------- -------  9/11 [blosc2]   -------------------------------- -------  9/11 [blosc2]   -------------------------------- -------  9/11 [blosc2]   ------------------------------------ --- 10/11 [tables]   ------------------------------------ --- 10/11 [tables]   ------------------------------------ --- 10/11 [tables]   ------------------------------------ --- 10/11 [tables]   ------------------------------------ --- 10/11 [tables]   ------------------------------------ --- 10/11 [tables]   ------------------------------------ --- 10/11 [tables]   ------------------------------------ --- 10/11 [tables]   ------------------------------------ --- 10/11 [tables]   ------------------------------------ --- 10/11 [tables]   ------------------------------------ --- 10/11 [tables]   ------------------------------------ --- 10/11 [tables]   ------------------------------------ --- 10/11 [tables]   ------------------------------------ --- 10/11 [tables]   ------------------------------------ --- 10/11 [tables]   ------------------------------------ --- 10/11 [tables]   ------------------------------------ --- 10/11 [tables]   ------------------------------------ --- 10/11 [tables]   ---------------------------------------- 11/11 [tables]
+Successfully installed blosc2-3.12.2 certifi-2025.11.12 charset_normalizer-3.4.4 idna-3.11 msgpack-1.1.2 ndindex-1.10.1 numexpr-2.14.1 py-cpuinfo-9.0.0 requests-2.32.5 tables-3.10.2 urllib3-2.6.0
