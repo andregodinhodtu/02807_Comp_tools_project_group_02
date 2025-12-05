@@ -113,7 +113,7 @@ def final_prediction_cleaner(text_prediction, stop_words_set):
 # It is computationally acceptable to use the version with loops so let's stick to it
 
 
-def cosine_similarity(vec_a, vec_b):
+def cosine_similarity_in_house(vec_a, vec_b):
     #implement cosine similarity between two same-sized vector stored in an numpy array
 
     if len(vec_a) != len(vec_b):
@@ -153,7 +153,7 @@ def predict_cat(cat_dict, test_vector, categories):
         ref_cat = cat[categories]
         ref_vector = cat['cosine_vect']
 
-        similarity = cosine_similarity(ref_vector, test_vector)
+        similarity = cosine_similarity_in_house(ref_vector, test_vector)
 
         if similarity > max_similarity:
             max_similarity = similarity
