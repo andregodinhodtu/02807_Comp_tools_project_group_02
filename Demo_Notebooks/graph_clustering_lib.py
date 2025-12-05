@@ -262,7 +262,7 @@ def export_clusters(df, labels, node_ids, method_name, subset_name="horoscope_fu
     result_df = result_df[cols].sort_values(by=['cluster_label', 'ID'])
 
     # 4. Save to HDF5
-    filename = f"{folder}{subset_name}_{method_name}_{threshold}.h5"
+    filename = f"{folder}{subset_name}_{method_name}.h5"
 
     # format='table' and data_columns=True enable SQL-like queries later
     # e.g., pd.read_hdf(..., where='cluster_label == 5')
