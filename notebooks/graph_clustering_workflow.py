@@ -27,12 +27,11 @@ input_method = 0
 
 # MinHashing input
 subset_idd = "love"
-input_file_name = f"similarity_{subset_idd}_lsh"  # MinHashing
+input_file_name_mh = f"similarity_{subset_idd}_lsh"  # MinHashing
 
 # Frequent Itemsets input
-# input_file_name = "shared_2_itemsets_pairs"  # Frequent Itemsets
-# input_file_name = "shared_2_itemsets_pairs" # Frequent Itemsets
-# !! be sure to set the correct input_file_name according to input_method !!
+# input_file_name_fi = "shared_2_itemsets_pairs"  # Frequent Itemsets
+input_file_name_fi = "frequent_itemsets_all_k" # Frequent Itemsets
 
 threshold = 0.3 # edges with weight below this value will be ignored
 methods = [ # select the methods you want to run by commenting
@@ -56,7 +55,7 @@ method_runtimes = {}
 
 # MinHashing
 if input_method == 0:
-    df_minhash = pd.read_csv(f'..\\pre_results\\minhashing\\{input_file_name}.csv')
+    df_minhash = pd.read_csv(f'..\\pre_results\\minhashing\\{input_file_name_mh}.csv')
     print(df_minhash.head())
     M_thr, id_list, id_to_index = gcltr.make_simmatrix_from_couples(
         df_minhash,
@@ -67,7 +66,7 @@ if input_method == 0:
 
 # frequent itemsets
 if input_method == 1:
-    df_minhash = pd.read_csv(f'..\\pre_results\\{input_file_name}.csv')
+    df_minhash = pd.read_csv(f'..\\pre_results\\frequent_itemsets\\{input_file_name_fi}.csv')
     print(df_minhash.head())
     M_thr, id_list, id_to_index = gcltr.make_simmatrix_from_couples(
         df_minhash,
