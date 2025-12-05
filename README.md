@@ -16,18 +16,6 @@
 
 ---
 
-## Workflow - plan :
-
----
-
-## Further Analyze : 
-
-Once we clustered our people based on frequent items analyze, what can be inferred ?
- - are people more connected to people from their homecountries ? (correlation study)
- - do clusters make sense (is there a cluster of people wanting hugs, ...)
-
----
-
 ## DATASET
 
 DATASET : https://www.kaggle.com/datasets/vivekchary/sentiment-with-16-million-tweets-with-locations
@@ -37,29 +25,3 @@ datetime (str) | user ID (str) | tweet content (str) | location (str)
 
 
 ## Detailed Explanation
-
-### Graph Clustering
-First approach:
-The graph is first obtained by setting a */threshold*/ on the number of words in common connecting people: if two people tweeted similar */meaningful/* words more than */threshold/* times, they are considered as connected, otherwise no. 
-Second approach:
-Connect every users that once tweeted the same meaningful word(s). Connections between users have a weight equal to the number of word tweeted by both users: the result is a weighted graph.
-
-NB: */meaningful/* words
-
-## How to create new env 
-```
-python -m venv venv
-```
-(windows)
-```
-venv\Scripts\activate
-```
-(Mac/Linux)
-```
-source venv/bin/activate
-```
-Then, you need to install requirements:
-```
-pip install -r requirements.txt
-```
-Well done !
