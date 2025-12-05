@@ -1,2 +1,4 @@
 # .csv
 *.pyc
+pre_results/frequent_itemsets/sentence_jaccard_full.csv
+pre_results/frequent_itemsets/sentence_jaccard_love.csv
