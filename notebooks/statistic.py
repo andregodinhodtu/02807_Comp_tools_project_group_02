@@ -287,7 +287,6 @@ def generate_simple_copy_table(base_data_path, reports_folder_path):
     Generates a table of copies assuming that (Copies = Cluster Size - 1).
     """
     
-    # --- 1. Retrieve totals per category (the denominator) ---
     print("Calculating reference totals...")
     try:
         df_base = pd.read_csv(base_data_path)
@@ -298,7 +297,6 @@ def generate_simple_copy_table(base_data_path, reports_folder_path):
         print(f"Error loading base data: {e}")
         return
 
-    # --- 2. Loop over result files ---
     categories = ['career', 'general', 'love', 'wellness', 'full']
     # Adapt this list to the methods you actually executed
     methods = ['louvain', 'greedy', 'components'] 
@@ -342,7 +340,6 @@ def generate_simple_copy_table(base_data_path, reports_folder_path):
                 'Repetition_Rate': round(rate, 2)
             })
 
-    # --- 3. Create Pivot Tables (Clean display) ---
     df_res = pd.DataFrame(results)
 
     # Table 1: Absolute number of copies
@@ -473,18 +470,10 @@ def analyze_components_victimization(base_data_path, reports_folder_path):
     print("="*80)
     display(pivot_table.style.background_gradient(cmap='Reds', vmin=0, vmax=100).format("{:.2f}%"))
     
-    # Optional: Show raw counts for verification
-    # pivot_counts = df_res.pivot(index='Sign', columns='Category', values='Detected_Copies')
-    # display(pivot_counts)
-
     return df_res
 
 ###############################################################################
 def plot_small_clusters_distribution(reports_folder_path):
-    """
-    Displays 3 histograms (one per method) showing the distribution 
-    of cluster sizes (1 to 10) for each category.
-    """
     # Parameters
     categories = ['career', 'general', 'love', 'wellness', 'full']
     methods = ['louvain', 'greedy', 'components'] # Add 'girvan_newman' if necessary
@@ -527,11 +516,8 @@ def plot_small_clusters_distribution(reports_folder_path):
         # Merge data
         df_combined = pd.concat(data_for_plot, ignore_index=True)
         
-        # 2. Create Plot
         plt.figure(figsize=(14, 6))
         
-        # countplot automatically counts occurrences for each X
-        # hue='Category' creates grouped bars side-by-side
         ax = sns.countplot(
             data=df_combined, 
             x='Size', 
@@ -541,18 +527,102 @@ def plot_small_clusters_distribution(reports_folder_path):
             alpha=0.9
         )
         
-        # 3. Formatting
         plt.title(f"Small Cluster Size Distribution (1-{max_size_x}) - Method: {method.upper()}", fontsize=16, fontweight='bold', pad=20)
         plt.xlabel("Cluster Size (Number of horoscopes)", fontsize=12)
         plt.ylabel("Number of Clusters (Frequency)", fontsize=12)
         
-        # Legend and grid
         plt.legend(title='Category', bbox_to_anchor=(1.02, 1), loc='upper left')
         plt.grid(axis='y', linestyle='--', alpha=0.7)
         
-        # Add values on bars (optional, for readability)
         for container in ax.containers:
             ax.bar_label(container, fontsize=8, padding=2)
 
         plt.tight_layout()
         plt.show()
+        
+################################################################################
+def generate_cohesion_reports(hdf_file_path, threshold=0.5, min_cluster_size=2):
+    print(f"Reading file: {hdf_file_path}...")
+    try:
+        df = pd.read_hdf(hdf_file_path, key='clusters')
+    except (FileNotFoundError, KeyError):
+        print("Error: File inaccessible or key not found.")
+        return
+
+    # Cleaning
+    df = df.dropna(subset=['horoscope'])
+    counts = df['cluster_label'].value_counts()
+    valid_clusters = counts[counts >= min_cluster_size].index
+    
+    high_cohesion_data = []
+    mixed_cohesion_data = []
+    
+    print(f"Analyzing semantic cohesion on {len(valid_clusters)} clusters (Threshold={threshold})...")
+    
+    for cluster_id in valid_clusters:
+        texts = df[df['cluster_label'] == cluster_id]['horoscope'].tolist()
+        
+        if len(texts) < 2:
+            continue 
+
+        try:
+            tfidf = TfidfVectorizer(stop_words='english')
+            matrix = tfidf.fit_transform(texts)
+            sim_matrix = cosine_similarity(matrix)
+            
+            upper_triangle_indices = np.triu_indices_from(sim_matrix, k=1)
+            similarities = sim_matrix[upper_triangle_indices]
+            
+            if len(similarities) == 0:
+                continue
+
+            min_sim = np.min(similarities)
+            mean_sim = np.mean(similarities)
+            
+            row_data = {
+                'Cluster ID': cluster_id,
+                'Size': len(texts),
+                'Min Similarity': round(min_sim, 3),
+                'Mean Similarity': round(mean_sim, 3),
+                'Sample Text': texts[0][:100] + "..."
+            }
+            
+            if min_sim >= threshold:
+                high_cohesion_data.append(row_data)
+            else:
+                mixed_cohesion_data.append(row_data)
+                
+        except ValueError:
+            continue
+
+    cols = ['Cluster ID', 'Size', 'Min Similarity', 'Mean Similarity', 'Sample Text']
+
+    if high_cohesion_data:
+        df_high = pd.DataFrame(high_cohesion_data).sort_values('Min Similarity', ascending=False)
+    else:
+        df_high = pd.DataFrame(columns=cols)
+
+    if mixed_cohesion_data:
+        df_mixed = pd.DataFrame(mixed_cohesion_data).sort_values('Min Similarity', ascending=True)
+    else:
+        df_mixed = pd.DataFrame(columns=cols)
+    
+    base_name = hdf_file_path.replace('.h5', '')
+    
+    print("\n" + "="*80)
+    print(f"HIGH COHESION CLUSTERS (Min Sim >= {threshold})")
+    print(f"   Number of clusters: {len(df_high)}")
+    if not df_high.empty:
+        display(df_high.head(5))
+        df_high.to_csv(f"{base_name}_high_cohesion.csv", index=False)
+    else:
+        print("   -> No clusters found.")
+
+    print("\n" + "="*80)
+    print(f"MIXED COHESION CLUSTERS (Min Sim < {threshold})")
+    print(f"   Number of clusters: {len(df_mixed)}")
+    if not df_mixed.empty:
+        display(df_mixed.head(5))
+        df_mixed.to_csv(f"{base_name}_mixed_cohesion.csv", index=False)
+    else:
+        print("   -> No clusters found.")
