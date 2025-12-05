@@ -10,36 +10,13 @@
 
 ---
 
-## Date
+## Idea / Abstarct
 
-11/11/2025
-
----
-
-## Idea
-
-> The goal for now is to make data analysis to build a social network that connects people together on a basis that is not on their similarities, but their common interest.
+> The goal of the project is to analyze the semantic structure and uniqueness of daily horoscopes, determining whether they contain truly distinctive content or rely on repetitive and generic language. By applying computational text analysis methods such as TF-IDF, MinHashing, and Frequent Itemset Mining alongside graph-based clustering techniques like the Louvain and Greedy algorithms, the study measures textual redundancy and explores whether each zodiac sign’s vocabulary reflects meaningful differences or follows random patterns. Ultimately, the project aims to challenge the specificity, authenticity, and scientific validity of astrological forecasting through a rigorous quantitative analysis of language use.
 
 ---
 
 ## Workflow - plan :
-
- - Sampling and cleaning of the dataset (@Ljutard2023)
-   - input : the whole dataset
-   - output : a few shorter datasets, chosen with interest (no missing values, selection of 'users, ...). Same features as before, with selected observations.
-   - You will find subsets of different sizes with the location in the [data](./data/) folder. You can also use [Data_Analysis](/notebooks/Data_Analysis.ipynb) notebook to obtain the same subsets without the location. 
- - MinHashing (@Teeresio) --> do whatever bro I don't understand that
- - Computing of frequent itemsets for tweets (@MaxenceMarbouty)
-   - input : a dataset sample
-   - output : the same dataset with a new column for frequent items found for each tweet
- - Description of the people using frequent itemsets (@andregodinhodtu)
-   - input : dataset with frequent items
-   - output : matrix of distances between people (counting of the common frequent items between people)
- - Graph design and clustering of people (@matlafENSTA)
-   - input : @andregodinhodtu's matrix
-   - output : 
-     - graph analyze (nodes = people, weighted links = items in common).
-     - clusters (Girvan-Newman, Louvain, Spectral Clustering...)
 
 ---
 
