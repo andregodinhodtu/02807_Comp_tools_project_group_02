@@ -14,14 +14,11 @@ subset_idd = "career"
 # ---------------------------------------------------
 # Graph Clustering
 # ---------------------------------------------------
-import numpy as np
 import pandas as pd
 from scipy import sparse
-import matplotlib.pyplot as plt
-import time
 import networkx as nx
-from sklearn.metrics import adjusted_rand_score, rand_score, normalized_mutual_info_score
-from IPython.display import display
+
+# custom graph clustering library
 import notebooks.graph_clustering_lib as gcltr
 
 M_thr, id_list, id_to_index = gcltr.make_simmatrix_from_couples(
