@@ -18,7 +18,7 @@
 
 ## DATASET
 
-DATASET : https://www.kaggle.com/datasets/vivekchary/sentiment-with-16-million-tweets-with-locations
+DATASET : https://www.kaggle.com/datasets/shahp7575/horoscopes
 
 Content :
 datetime (str) | user ID (str) | tweet content (str) | location (str)
