@@ -1,4 +1,5 @@
 # %%
+# %%
 import numpy as np
 import pandas as pd
 from scipy import sparse
@@ -16,28 +17,30 @@ from IPython.display import display
 
 import graph_clustering_lib as gcltr
 
+# ---------------------------------------------
 full_dataset = "horoscope_full"
 df = pd.read_csv(f'..\\data\\{full_dataset}.csv')
 df.head()
 
-input_method = 0
+input_method = 1
 # 0 for MinHashing matrix
 # 1 for Frequent Itemsets matrix
 # 2 for Random graph
 
+subset_idd = "full"
+
 # MinHashing input
-subset_idd = "love"
 input_file_name_mh = f"similarity_{subset_idd}_lsh"  # MinHashing
 
 # Frequent Itemsets input
-# input_file_name_fi = "shared_2_itemsets_pairs"  # Frequent Itemsets
-input_file_name_fi = "frequent_itemsets_all_k" # Frequent Itemsets
+input_file_name_fi = f"sentence_jaccard_{subset_idd}" # Frequent Itemsets
 
-threshold = 0.3 # edges with weight below this value will be ignored
+threshold = 0.4 # edges with weight below this value will be ignored
+# careful, for frequent itemsets, similarity depends on the input dataset (for example, if id1 and id2 have s1imilarity 0.4 in full dataset, they may have similarity 0.6 in a smaller subset)
 methods = [ # select the methods you want to run by commenting
     'components',
-    # 'louvain',
-    # 'girvan_newman',
+    'louvain',
+    # 'girvan_newman', # very long to run, use only for small graphs
     'greedy',
 ]
 plot_graph = False
@@ -45,9 +48,13 @@ pre_visualization = False
 
 # Number of largest clusters to plot (when labels available)
 nb_clusters_to_plot = 30
+# ---------------------------------------------
 
 # Dictionary to store runtimes for each method
 method_runtimes = {}
+
+input_method_name = "freqitemsets" if input_method == 1 else ("minhashing" if input_method == 0 else "randomgraph")
+res_folder = f"..\\pre_results\\clusters_{input_method_name}\\"
 
 # ---------------------------------------------
 #   Make similarity matrix from input data
@@ -71,7 +78,7 @@ if input_method == 1:
     M_thr, id_list, id_to_index = gcltr.make_simmatrix_from_couples(
         df_minhash,
         threshold=threshold,
-        sim_col="value",
+        sim_col="similarity",
         scaling=True,
     )
     print(M_thr)
@@ -116,20 +123,39 @@ node_order = sorted(G.nodes())
 if 'components' in methods:
     print("\n--- Pre-analyze graph (components) ---")
     try:
-        pre_info = gcltr.pre_analyze_graph(
-            G=G,
-            df=df,
-            subset_name=subset_idd,
-            folder="..\\pre_results\\clusters\\",
-            top_k_visualize=nb_clusters_to_plot,
-            method_name="components"
-        )
-        print(f"Components found: {pre_info['n_components']}")
+        pre_res = gcltr.pre_analyze_graph(G=G)
+        print(f"Components found: {pre_res['n_components']}")
         # Print modularity of the components partition
-        if 'Q' in pre_info:
-            print(f"Components Modularity Q: {pre_info['Q']:.4f}")
+        if 'Q' in pre_res:
+            print(f"Components Modularity Q: {pre_res['Q']:.4f}")
     except Exception as e:
         print("Pre-analyze failed:", e)
+
+    try: # Export as clusters (component labels)
+        gcltr.export_clusters(
+            df=df,
+            labels=pre_res['labels'],
+            node_ids=node_order,
+            method_name="components",
+            subset_name=subset_idd,
+            folder=res_folder,
+            threshold=threshold
+        )
+    except Exception as e:
+        print("Components export failed:", e)
+    
+    if plot_graph:
+        try: # Visualize only the largest components
+            gcltr.visualize_graph(
+                G,
+                labels=pre_res['labels'],
+                title=f"Top {nb_clusters_to_plot} components by size | method : components | subset : {subset_idd}",
+                nb_clusters=nb_clusters_to_plot
+                )
+        except Exception as e:
+            print("Components visualization failed:", e)
+
+
 
 # ---------------------------------------------
 #             Louvain Clustering
@@ -175,10 +201,23 @@ if 'louvain' in methods:
             labels=best_labels, 
             node_ids=nodes_ordered, 
             method_name='louvain', 
-            subset_name=subset_idd
+            subset_name=subset_idd,
+            folder=res_folder,
+            threshold=threshold
         )
     except Exception as e:
         print('Louvain export failed:', e)
+
+    # Optional: export least connected pairs to assess the quality of the clustering
+    # try:
+    #     clustering_path_louvain = f"..\\pre_results\\clusters_{input_method_name}\\{subset_idd}_louvain.h5"
+    #     gcltr.least_connected_pairs_from_h5(
+    #         h5_path=clustering_path_louvain,
+    #         G=G,
+    #         output_csv_path=f"{clustering_path_louvain.split('.h5')[0]}_least_connected_pairs.csv"
+    #     )
+    # except Exception as e:
+    #     print('Louvain least connected pairs export failed:', e)
 
     method_runtimes['louvain'] = time.perf_counter() - t0
     print(f"Louvain runtime: {method_runtimes['louvain']:.2f} s")
@@ -225,7 +264,8 @@ if 'girvan_newman' in methods:
             df=df,
             labels=gn_best_labels,
             method_name='girvan_newman',
-            subset_name=subset_idd
+            subset_name=subset_idd,
+            folder=res_folder
         )
     except Exception as e:
         print('GN export failed:', e)
@@ -241,8 +281,6 @@ if 'greedy' in methods:
     greedy_labels = greedy_result['labels']
     Q_gm = greedy_result['Q']
     print(f"Greedy Modularity Q: {Q_gm:.4f}; communities={len(gm_comms)}")
-    # Visualize
-    gcltr.visualize_graph(G, greedy_labels, title=f"Greedy Modularity partition (Q={Q_gm:.3f}, k={len(gm_comms)})", nb_clusters=nb_clusters_to_plot)
 
     # Optional: export clusters
     try:
@@ -251,21 +289,46 @@ if 'greedy' in methods:
             labels=greedy_labels,
             node_ids=node_order,
             method_name='greedy',
-            subset_name=subset_idd
+            subset_name=subset_idd,
+            folder=res_folder,
+            threshold=threshold
         )
     except Exception as e:
         print('Greedy export failed:', e)
+    # Visualize
+    if plot_graph:
+        gcltr.visualize_graph(
+            G,
+            greedy_labels,
+            title=f"Greedy Modularity partition (Q={Q_gm:.3f}, k={len(gm_comms)})",
+            nb_clusters=nb_clusters_to_plot
+            )
+
+    # Optional: export least connected pairs to assess the quality of the clustering
+    # try:
+    #     clustering_path_greedy = f"..\\pre_results\\clusters_{input_method_name}\\{subset_idd}_greedy.h5"
+    #     gcltr.least_connected_pairs_from_h5(
+    #         h5_path=clustering_path_greedy,
+    #         G=G,
+    #         output_txt_path=f"{clustering_path_greedy.split('.h5')[0]}_least_connected_pairs.txt"
+
+    #     )
+    # except Exception as e:
+    #     print('Greedy least connected pairs export failed:', e)
 
     method_runtimes['greedy'] = time.perf_counter() - t0_g
     print(f"Greedy Modularity runtime: {method_runtimes['greedy']:.2f} s")
 
+
 # ---------------------------------------------
 #    Compare Louvain and Greedy Modularity
 # ---------------------------------------------
+compare_louvain_greedy = False
+
 # Compare only if both label arrays exist
 have_louvain = 'best_labels' in globals()
 have_greedy = 'greedy_labels' in globals()
-if have_louvain and have_greedy:
+if have_louvain and have_greedy and compare_louvain_greedy:
     assert len(best_labels) == len(greedy_labels), "Label arrays must have same length"
     y_louvain = np.asarray(best_labels)
     y_greedy = np.asarray(greedy_labels)
@@ -279,7 +342,7 @@ if have_louvain and have_greedy:
     display(df_metrics)
     print(f"Louvain communities: {len(np.unique(y_louvain))}, Greedy communities: {len(np.unique(y_greedy))}")
     # save comparison in csv file
-    df_metrics.to_csv(f"..\\pre_results\\clusters\\{subset_idd}_louvain_vs_greedy.csv")
+    df_metrics.to_csv(f"..\\pre_results\\{res_folder}\\{subset_idd}_louvain_vs_greedy.csv")
 else:
     print("Skipping Louvain vs Greedy comparison:",
           f"Louvain={'available' if have_louvain else 'missing'},",
