@@ -6,3 +6,4 @@ networkx>=2.6.0
 scikit-learn>=1.0.0
 tables>=3.6.0
 jupyter
+mmh3
